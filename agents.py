@@ -36,9 +36,17 @@ class InputHandler:
         """Load and preprocess the image."""
         try:
             image_path = state["image_path"]
+            
+            # Check if file exists
+            if not Path(image_path).exists():
+                state["error"] = f"File not found: {image_path}"
+                return state
+            
             with open(image_path, "rb") as f:
                 state["image_data"] = f.read()
             state["image_name"] = Path(image_path).stem
+        except FileNotFoundError:
+            state["error"] = f"File not found: {state['image_path']}"
         except Exception as e:
             state["error"] = f"Input handler error: {str(e)}"
         return state

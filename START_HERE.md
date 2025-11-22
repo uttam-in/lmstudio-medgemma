@@ -43,6 +43,14 @@ python run_quick_test.py
 ```
 ✅ Analyzes 3 X-rays to verify everything works
 
+### 4. Run Full Analysis (ALL 223,414 images)
+```bash
+python main.py
+```
+⚠️ **Warning**: This processes ALL images and takes ~18 days!
+- See `RUN_FULL_ANALYSIS.md` for detailed guidance
+- Edit `main.py` line 30 to process fewer images for testing
+
 ---
 
 ## 📁 Files Created/Updated

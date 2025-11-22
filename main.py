@@ -44,21 +44,40 @@ def main():
     print("✓ Workflow created with nodes: Input Handler → Processor → Evaluator → Output Handler")
     
     # Get images to process
-    print("\n[3] Loading images from CSV...")
-    image_paths = get_image_files_from_csv(GROUND_TRUTH_CSV, limit=10)  # Start with 10 for testing
+    print("\n[3] Loading ALL images from CSV...")
+    image_paths = get_image_files_from_csv(GROUND_TRUTH_CSV, limit=None)  # Process ALL images
     print(f"✓ Processing {len(image_paths)} images")
+    print(f"⚠ This will take approximately {len(image_paths) * 7 / 3600:.1f} hours")
+    print(f"⚠ Results will be saved every 100 images to prevent data loss")
     
     # Process images with batch processor
     print("\n[4] Processing images...")
     print("-" * 80)
     
-    batch_processor = BatchProcessor(batch_size=10, save_interval=5)
+    batch_processor = BatchProcessor(batch_size=100, save_interval=100)
     batch_processor.start()
     
     results = []
     condition_stats = {condition: {"correct": 0, "total": 0} for condition in TARGET_CONDITIONS}
+    skipped_count = 0
+    
+    start_time = datetime.now()
+    print(f"\n⏱ Started at: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"📊 Progress will be displayed every 10 images")
+    print(f"💾 Results will be saved every 100 images")
+    print(f"⚠ Files not found will be skipped automatically")
+    print()
     
     for idx, image_path in enumerate(image_paths, 1):
+        # Check if file exists before processing
+        if not Path(image_path).exists():
+            skipped_count += 1
+            if skipped_count <= 10:  # Only show first 10 skipped files
+                print(f"⚠ Skipping (file not found): {image_path}")
+            elif skipped_count == 11:
+                print(f"⚠ More files not found... (will continue silently)")
+            continue
+        
         # Create initial state
         initial_state = {
             "image_path": image_path,
@@ -108,6 +127,17 @@ def main():
                 os.makedirs(RESULTS_PATH, exist_ok=True)
                 temp_file = f"{RESULTS_PATH}/results_temp.csv"
                 pd.DataFrame(results).to_csv(temp_file, index=False)
+                print(f"\n💾 Intermediate results saved ({len(results)} images processed)")
+                print(f"⏱ Current time: {datetime.now().strftime('%H:%M:%S')}")
+                
+                # Show current accuracy
+                print("📊 Current accuracy:")
+                for condition in TARGET_CONDITIONS:
+                    total = condition_stats[condition]["total"]
+                    correct = condition_stats[condition]["correct"]
+                    accuracy = (correct / total * 100) if total > 0 else 0
+                    print(f"   {condition}: {correct}/{total} ({accuracy:.2f}%)")
+                print()
                 
         except Exception as e:
             batch_processor.error_count += 1
@@ -122,9 +152,18 @@ def main():
     print("=" * 80)
     
     if results:
+        end_time = datetime.now()
+        duration = end_time - start_time
+        hours = duration.total_seconds() / 3600
+        
         # Calculate accuracy per condition
-        print(f"\nTotal images processed: {len(results)}")
-        print("\nAccuracy per condition:")
+        print(f"\nTotal images in CSV: {len(image_paths)}")
+        print(f"Images processed: {len(results)}")
+        print(f"Images skipped (not found): {skipped_count}")
+        print(f"⏱ Total processing time: {hours:.2f} hours ({duration.total_seconds()/60:.1f} minutes)")
+        print(f"⚡ Average time per image: {duration.total_seconds()/len(results):.2f} seconds")
+        
+        print("\n📊 Final Accuracy per condition:")
         for condition in TARGET_CONDITIONS:
             total = condition_stats[condition]["total"]
             correct = condition_stats[condition]["correct"]
@@ -141,8 +180,11 @@ def main():
         print(f"\n✓ Results saved to: {results_file}")
         
         # Show sample results
-        print("\nSample results:")
+        print("\nSample results (first 5):")
         print(df_results.head(5).to_string(index=False))
+        
+        print("\nSample results (last 5):")
+        print(df_results.tail(5).to_string(index=False))
     else:
         print("\nNo results to display.")
     
