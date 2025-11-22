@@ -1,0 +1,32 @@
+// Dermatology Classification System Architecture
+digraph {
+	rankdir=TB size="12,10"
+	node [fontname=Arial shape=box style="rounded,filled"]
+	orchestrator [label="Orchestrator
+(LangGraph StateGraph)" fillcolor="#E8F4F8" fontname="Arial Bold" fontsize=14]
+	input [label="Input Handler
+(Load & Preprocess)" fillcolor="#B8E6F0"]
+	processor [label="Multimodal Media
+Processor" fillcolor="#B8E6F0"]
+	evaluator [label="Result Evaluator
+(Compare with Ground Truth)" fillcolor="#B8E6F0"]
+	output [label="Output Handler
+(Store Results)" fillcolor="#B8E6F0"]
+	llm [label="Generative AI LLM
+(medgemma-27b-multimodal)
+via LM Studio" fillcolor="#FF9966" fontsize=12 shape=box3d]
+	images [label="Dermatology Images
+(archive/)" fillcolor="#FFE6CC" shape=folder]
+	ground_truth [label="Ground Truth CSV" fillcolor="#FFE6CC" shape=note]
+	results [label="Results & Metrics" fillcolor="#FFE6CC" shape=note]
+	orchestrator -> input [label=1]
+	input -> processor [label=2]
+	processor -> evaluator [label=3]
+	evaluator -> output [label=4]
+	processor -> llm [label="image + prompt" color="#FF6633" style=dashed]
+	llm -> processor [label="top-3 predictions" color="#FF6633" style=dashed]
+	images -> input [style=dotted]
+	ground_truth -> evaluator [style=dotted]
+	output -> results [style=dotted]
+	orchestrator -> output [label=5 style=invis]
+}
