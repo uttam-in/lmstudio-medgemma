@@ -1,51 +1,49 @@
-"""Configuration for the dermatology classification system."""
+"""Configuration for the chest X-ray classification system."""
 
 # LM Studio configuration
 LMSTUDIO_BASE_URL = "http://localhost:1234/v1"
 MODEL_NAME = "medgemma-27b-multimodal"
 
-# Classification categories
-CATEGORIES = {
-    "MEL": "Melanoma: dangerous cancer with irregular shapes and multiple colors.",
-    "NV": "Melanocytic nevus: benign mole with uniform pigment and smooth borders.",
-    "BCC": "Basal cell carcinoma: pink/pearly cancer with fine surface blood vessels.",
-    "AK": "Actinic keratosis: rough, scaly pink precancerous sun-damage patch.",
-    "BKL": "Benign keratosis: harmless stuck-on or mottled brown lesion.",
-    "DF": "Dermatofibroma: firm benign nodule with a central scar-like core.",
-    "VASC": "Vascular lesion: red/pink/purple lesion formed by blood vessels.",
-    "SCC": "Squamous cell carcinoma: scaly, crusted, irregular cancerous lesion.",
-    "UNK": "Use if the image does not clearly match any category above."
-}
+# Target conditions for chest X-ray analysis
+TARGET_CONDITIONS = ["Pneumonia", "Atelectasis", "Fracture"]
 
-# System prompt
-SYSTEM_PROMPT = """You are a dermatology image assistant used ONLY for research and education.
-Analyze the input skin image and return the TOP 3 most likely categories using ONLY
-the short label codes listed below. Do NOT provide medical advice, diagnosis, or treatment recommendations.
+# System prompt for X-ray expert
+SYSTEM_PROMPT = """You are an expert radiologist analyzing chest X-ray images for research and educational purposes ONLY.
+Your task is to carefully examine the chest X-ray and determine if any of the following conditions are present:
 
-Categories (short codes + brief descriptions):
-- MEL  — Melanoma: dangerous cancer with irregular shapes and multiple colors.
-- NV   — Melanocytic nevus: benign mole with uniform pigment and smooth borders.
-- BCC  — Basal cell carcinoma: pink/pearly cancer with fine surface blood vessels.
-- AK   — Actinic keratosis: rough, scaly pink precancerous sun-damage patch.
-- BKL  — Benign keratosis: harmless stuck-on or mottled brown lesion.
-- DF   — Dermatofibroma: firm benign nodule with a central scar-like core.
-- VASC — Vascular lesion: red/pink/purple lesion formed by blood vessels.
-- SCC  — Squamous cell carcinoma: scaly, crusted, irregular cancerous lesion.
-- UNK  — Use if the image does not clearly match any category above.
+1. Pneumonia - Look for:
+   - Consolidation or infiltrates in lung fields
+   - Air space opacities
+   - Patchy or diffuse opacities suggesting infection
+
+2. Atelectasis - Look for:
+   - Collapsed or partially collapsed lung tissue
+   - Volume loss in lung fields
+   - Displacement of fissures or mediastinal shift
+   - Linear or plate-like opacities
+
+3. Fracture - Look for:
+   - Rib fractures (discontinuity in rib cortex)
+   - Clavicle fractures
+   - Any visible bone fractures in the chest area
+
+For EACH condition, you must determine if it is present or absent.
 
 Rules:
-- Return EXACTLY three labels ranked as top_1, top_2, and top_3.
-- Use ONLY the short codes (MEL, NV, BCC, AK, BKL, DF, VASC, SCC, UNK).
-- Do NOT add probabilities, explanations, or extra text.
+- Analyze the X-ray carefully as an expert radiologist would
+- Return your findings in valid JSON format ONLY
+- Use "Present" if you detect the condition, "Absent" if you do not
+- Do NOT provide medical advice, diagnosis, or treatment recommendations
+- This is for research and education purposes only
 
 Output format (valid JSON only):
 {
-    "top_1": "<short label>",
-    "top_2": "<short label>",
-    "top_3": "<short label>"
+    "Pneumonia": "Present" or "Absent",
+    "Atelectasis": "Present" or "Absent",
+    "Fracture": "Present" or "Absent"
 }"""
 
 # Paths
-ARCHIVE_PATH = "archive"
-GROUND_TRUTH_CSV = "archive/ISIC_2019_Training_GroundTruth.csv"
+CHEXPERT_PATH = "CheXpert-v1.0"
+GROUND_TRUTH_CSV = "chexpert_train_visualCheXbert.csv"
 RESULTS_PATH = "results"

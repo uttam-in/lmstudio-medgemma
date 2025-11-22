@@ -8,7 +8,7 @@ from PIL import Image
 import io
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
-from config import LMSTUDIO_BASE_URL, MODEL_NAME, SYSTEM_PROMPT, CATEGORIES
+from config import LMSTUDIO_BASE_URL, MODEL_NAME, SYSTEM_PROMPT, TARGET_CONDITIONS
 
 
 class State(TypedDict):
@@ -17,8 +17,8 @@ class State(TypedDict):
     image_name: str
     image_data: bytes
     prediction: Dict[str, str]
-    ground_truth: str
-    is_correct: bool
+    ground_truth: Dict[str, float]
+    evaluation: Dict[str, bool]
     error: str
 
 
@@ -77,7 +77,7 @@ class MultimodalProcessor:
                         },
                         {
                             "type": "text",
-                            "text": "Analyze this dermatology image and provide your top 3 predictions in JSON format."
+                            "text": "Analyze this chest X-ray image and determine if Pneumonia, Atelectasis, or Fracture are present. Provide your findings in JSON format."
                         }
                     ]
                 )
@@ -125,32 +125,38 @@ class ResultEvaluator:
             return state
         
         try:
-            image_name = state["image_name"]
+            image_path = state["image_path"]
             prediction = state["prediction"]
             
-            # Get ground truth
-            row = self.ground_truth_df[self.ground_truth_df['image'] == image_name]
+            # Get ground truth - match by Path column
+            row = self.ground_truth_df[self.ground_truth_df['Path'] == image_path]
             if row.empty:
-                state["error"] = f"No ground truth found for {image_name}"
+                state["error"] = f"No ground truth found for {image_path}"
                 return state
             
-            # Find true label
-            true_label = None
-            for col in CATEGORIES.keys():
-                if row[col].values[0] == 1.0:
-                    true_label = col
-                    break
+            # Extract ground truth for target conditions
+            ground_truth = {}
+            for condition in TARGET_CONDITIONS:
+                if condition in row.columns:
+                    ground_truth[condition] = row[condition].values[0]
+                else:
+                    ground_truth[condition] = 0.0
             
-            state["ground_truth"] = true_label
+            state["ground_truth"] = ground_truth
             
-            # Check if prediction is correct (any of top 3 matches)
-            predicted_labels = [
-                prediction.get("top_1"),
-                prediction.get("top_2"),
-                prediction.get("top_3")
-            ]
+            # Evaluate each condition
+            evaluation = {}
+            for condition in TARGET_CONDITIONS:
+                pred_value = prediction.get(condition, "Absent")
+                true_value = ground_truth.get(condition, 0.0)
+                
+                # Convert prediction to binary (Present=1, Absent=0)
+                pred_binary = 1.0 if pred_value == "Present" else 0.0
+                
+                # Check if prediction matches ground truth
+                evaluation[condition] = (pred_binary == true_value)
             
-            state["is_correct"] = true_label in predicted_labels
+            state["evaluation"] = evaluation
             
         except Exception as e:
             state["error"] = f"Evaluator error: {str(e)}"

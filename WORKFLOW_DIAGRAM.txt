@@ -1,0 +1,208 @@
+================================================================================
+                    CHEST X-RAY ANALYSIS WORKFLOW
+================================================================================
+
+STEP 1: DATA LOADING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    ┌─────────────────────────────────────┐
+    │  chexpert_train_visualCheXbert.csv  │
+    │                                     │
+    │  223,414 chest X-ray records        │
+    │  Columns: Path, Pneumonia,          │
+    │           Atelectasis, Fracture...  │
+    └──────────────────┬──────────────────┘
+                       │
+                       ▼
+              ┌────────────────┐
+              │  Extract Paths │
+              └────────┬───────┘
+                       │
+                       ▼
+        ┌──────────────────────────┐
+        │  Image Path List         │
+        │  (10, 100, or all)       │
+        └──────────┬───────────────┘
+
+
+STEP 2: LANGGRAPH WORKFLOW (for each image)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                      INPUT HANDLER                              │
+    │                                                                 │
+    │  Input:  image_path                                            │
+    │  Action: Load X-ray image from disk                            │
+    │  Output: image_data (bytes), image_name                        │
+    └──────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                   MULTIMODAL PROCESSOR                          │
+    │                                                                 │
+    │  Input:  image_data                                            │
+    │  Action: Send to LM Studio with expert prompt                  │
+    │          "You are an expert radiologist..."                    │
+    │  Output: {                                                     │
+    │            "Pneumonia": "Present" or "Absent",                 │
+    │            "Atelectasis": "Present" or "Absent",               │
+    │            "Fracture": "Present" or "Absent"                   │
+    │          }                                                     │
+    └──────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                     RESULT EVALUATOR                            │
+    │                                                                 │
+    │  Input:  prediction, image_path                                │
+    │  Action: Look up ground truth from CSV                         │
+    │          Compare each condition                                │
+    │  Output: ground_truth = {                                      │
+    │            "Pneumonia": 1.0 or 0.0,                            │
+    │            "Atelectasis": 1.0 or 0.0,                          │
+    │            "Fracture": 1.0 or 0.0                              │
+    │          }                                                     │
+    │          evaluation = {                                        │
+    │            "Pneumonia": True/False,                            │
+    │            "Atelectasis": True/False,                          │
+    │            "Fracture": True/False                              │
+    │          }                                                     │
+    └──────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                      OUTPUT HANDLER                             │
+    │                                                                 │
+    │  Input:  Complete state                                        │
+    │  Action: Pass through (for future extensions)                  │
+    │  Output: Final state                                           │
+    └──────────────────────────┬──────────────────────────────────────┘
+
+
+STEP 3: RESULT AGGREGATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                               │
+                               ▼
+              ┌────────────────────────────┐
+              │  Collect Results           │
+              │  - All predictions         │
+              │  - All ground truths       │
+              │  - All evaluations         │
+              └────────────┬───────────────┘
+                           │
+                           ▼
+              ┌────────────────────────────┐
+              │  Calculate Accuracy        │
+              │                            │
+              │  Per Condition:            │
+              │  - Pneumonia: X/Y (Z%)     │
+              │  - Atelectasis: X/Y (Z%)   │
+              │  - Fracture: X/Y (Z%)      │
+              └────────────┬───────────────┘
+                           │
+                           ▼
+              ┌────────────────────────────┐
+              │  Save to CSV               │
+              │                            │
+              │  results/                  │
+              │  chexpert_results_         │
+              │  TIMESTAMP.csv             │
+              └────────────────────────────┘
+
+
+EXAMPLE OUTPUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Processing 10 images...
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[1/10] view1_frontal.jpg ✓
+  Ground Truth:    Pneumonia=Absent, Atelectasis=Absent, Fracture=Absent
+  AI Prediction:   Pneumonia=Absent, Atelectasis=Absent, Fracture=Absent
+  Result:          ✓ ✓ ✓
+
+[2/10] view1_frontal.jpg ✓
+  Ground Truth:    Pneumonia=Absent, Atelectasis=Present, Fracture=Absent
+  AI Prediction:   Pneumonia=Absent, Atelectasis=Present, Fracture=Absent
+  Result:          ✓ ✓ ✓
+
+[3/10] view1_frontal.jpg ✗
+  Ground Truth:    Pneumonia=Present, Atelectasis=Present, Fracture=Present
+  AI Prediction:   Pneumonia=Present, Atelectasis=Present, Fracture=Absent
+  Result:          ✓ ✓ ✗
+
+...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RESULTS SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Total images processed: 10
+
+Accuracy per condition:
+  Pneumonia: 8/10 (80.00%)
+  Atelectasis: 9/10 (90.00%)
+  Fracture: 7/10 (70.00%)
+
+✓ Results saved to: results/chexpert_results_20241122_143022.csv
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+KEY COMPONENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─────────────────┐
+│   config.py     │  → System configuration, prompts, paths
+└─────────────────┘
+
+┌─────────────────┐
+│   agents.py     │  → AI agents (Input, Processor, Evaluator, Output)
+└─────────────────┘
+
+┌─────────────────┐
+│   graph.py      │  → LangGraph workflow definition
+└─────────────────┘
+
+┌─────────────────┐
+│   main.py       │  → Main orchestrator, batch processing
+└─────────────────┘
+
+┌─────────────────┐
+│  LM Studio      │  → Local AI server (medgemma-27b-multimodal)
+└─────────────────┘
+
+
+TESTING WORKFLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. python check_lmstudio.py
+   └─→ Verify LM Studio is running
+
+2. python test_xray_system.py
+   └─→ Verify configuration and data
+
+3. python run_quick_test.py
+   └─→ Test with 3 images (one per condition)
+
+4. python main.py
+   └─→ Run full analysis (10+ images)
+
+
+CUSTOMIZATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Number of images:
+  main.py, line 30: limit=10 (or 100, 1000, None)
+
+Batch settings:
+  main.py, line 37: batch_size=10, save_interval=5
+
+Model temperature:
+  agents.py, line 52: temperature=0.1
+
+Target conditions:
+  config.py, line 7: TARGET_CONDITIONS = [...]
+
+================================================================================
