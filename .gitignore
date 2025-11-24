@@ -55,3 +55,4 @@ archive
 .conda
 .env
 CheXpert-v1.0
+results_osai
