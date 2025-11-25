@@ -2,13 +2,19 @@
 
 import json
 import base64
+import os
 from pathlib import Path
 from typing import TypedDict, List, Dict, Any
 from PIL import Image
 import io
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
-from config import LMSTUDIO_BASE_URL, MODEL_NAME, SYSTEM_PROMPT, TARGET_CONDITIONS
+from config import LMSTUDIO_BASE_URL, MODEL_NAME, SYSTEM_PROMPT, TARGET_CONDITIONS, USE_GEMINI, LMSTUDIO_MODEL_NAME
+
+# Load environment variables
+load_dotenv()
 
 
 class State(TypedDict):
@@ -56,12 +62,27 @@ class MultimodalProcessor:
     """Processes images using multimodal LLM."""
     
     def __init__(self):
-        self.llm = ChatOpenAI(
-            base_url=LMSTUDIO_BASE_URL,
-            api_key="lm-studio",
-            model=MODEL_NAME,
-            temperature=0.1
-        )
+        if USE_GEMINI:
+            # Use Gemini API
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY not found in environment variables")
+            
+            self.llm = ChatGoogleGenerativeAI(
+                model=MODEL_NAME,
+                google_api_key=api_key,
+                temperature=0.1
+            )
+            self.use_gemini = True
+        else:
+            # Use LM Studio
+            self.llm = ChatOpenAI(
+                base_url=LMSTUDIO_BASE_URL,
+                api_key="lm-studio",
+                model=LMSTUDIO_MODEL_NAME,
+                temperature=0.1
+            )
+            self.use_gemini = False
     
     def process(self, state: State) -> State:
         """Process image with multimodal LLM."""
@@ -72,24 +93,41 @@ class MultimodalProcessor:
             # Encode image
             base64_image = base64.b64encode(state["image_data"]).decode('utf-8')
             
-            # Create message with image
-            messages = [
-                SystemMessage(content=SYSTEM_PROMPT),
-                HumanMessage(
-                    content=[
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
+            if self.use_gemini:
+                # Gemini API format
+                messages = [
+                    HumanMessage(
+                        content=[
+                            {
+                                "type": "text",
+                                "text": f"{SYSTEM_PROMPT}\n\nAnalyze this chest X-ray image and determine if Pneumonia, Atelectasis, or Fracture are present. Provide your findings in JSON format."
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": f"data:image/jpeg;base64,{base64_image}"
                             }
-                        },
-                        {
-                            "type": "text",
-                            "text": "Analyze this chest X-ray image and determine if Pneumonia, Atelectasis, or Fracture are present. Provide your findings in JSON format."
-                        }
-                    ]
-                )
-            ]
+                        ]
+                    )
+                ]
+            else:
+                # LM Studio format
+                messages = [
+                    SystemMessage(content=SYSTEM_PROMPT),
+                    HumanMessage(
+                        content=[
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{base64_image}"
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": "Analyze this chest X-ray image and determine if Pneumonia, Atelectasis, or Fracture are present. Provide your findings in JSON format."
+                            }
+                        ]
+                    )
+                ]
             
             response = self.llm.invoke(messages)
             

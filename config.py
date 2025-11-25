@@ -1,8 +1,12 @@
 """Configuration for the chest X-ray classification system."""
 
-# LM Studio configuration
+# Gemini API configuration
+MODEL_NAME = "gemini-2.5-flash"  # or "gemini-1.5-pro" for production
+USE_GEMINI = True  # Set to False to use LM Studio instead
+
+# LM Studio configuration (fallback)
 LMSTUDIO_BASE_URL = "http://localhost:1234/v1"
-MODEL_NAME = "medgemma-27b-multimodal"
+LMSTUDIO_MODEL_NAME = "medgemma-27b-multimodal"
 
 # Target conditions for chest X-ray analysis
 TARGET_CONDITIONS = ["Pneumonia", "Atelectasis", "Fracture"]
