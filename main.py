@@ -35,7 +35,7 @@ def main():
     """Main orchestrator function."""
     print("=" * 80)
     print("DERMATOLOGY IMAGE CLASSIFICATION SYSTEM")
-    print("Using LangGraph + LM Studio (medgemma-27b-multimodal)")
+    print("Using LangGraph + Google Gemini API (gemini-2.0-flash-exp)")
     print("=" * 80)
     
     # Load ground truth

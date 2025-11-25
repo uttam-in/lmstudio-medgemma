@@ -2,13 +2,17 @@
 
 import json
 import base64
+import os
 from pathlib import Path
 from typing import TypedDict, List, Dict, Any
 from PIL import Image
 import io
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage
-from config import LMSTUDIO_BASE_URL, MODEL_NAME, SYSTEM_PROMPT, CATEGORIES
+from dotenv import load_dotenv
+import google.generativeai as genai
+from config import MODEL_NAME, SYSTEM_PROMPT, CATEGORIES
+
+# Load environment variables
+load_dotenv()
 
 
 class State(TypedDict):
@@ -48,11 +52,21 @@ class MultimodalProcessor:
     """Processes images using multimodal LLM."""
     
     def __init__(self):
-        self.llm = ChatOpenAI(
-            base_url=LMSTUDIO_BASE_URL,
-            api_key="lm-studio",
-            model=MODEL_NAME,
-            temperature=0.1
+        # Configure Gemini API
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY not found in environment variables")
+        genai.configure(api_key=api_key)
+        
+        # Initialize model
+        self.model = genai.GenerativeModel(
+            model_name=MODEL_NAME,
+            generation_config={
+                "temperature": 0.1,
+                "top_p": 0.95,
+                "top_k": 40,
+                "max_output_tokens": 1024,
+            }
         )
     
     def process(self, state: State) -> State:
@@ -61,32 +75,19 @@ class MultimodalProcessor:
             return state
         
         try:
-            # Encode image
-            base64_image = base64.b64encode(state["image_data"]).decode('utf-8')
+            # Load image from bytes
+            image = Image.open(io.BytesIO(state["image_data"]))
             
-            # Create message with image
-            messages = [
-                SystemMessage(content=SYSTEM_PROMPT),
-                HumanMessage(
-                    content=[
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            }
-                        },
-                        {
-                            "type": "text",
-                            "text": "Analyze this dermatology image and provide your top 3 predictions in JSON format."
-                        }
-                    ]
-                )
-            ]
+            # Create prompt with system instructions
+            prompt = f"""{SYSTEM_PROMPT}
+
+Analyze this dermatology image and provide your top 3 predictions in JSON format."""
             
-            response = self.llm.invoke(messages)
+            # Generate response
+            response = self.model.generate_content([prompt, image])
             
             # Parse response
-            content = response.content
+            content = response.text
             # Extract JSON from response
             if "```json" in content:
                 content = content.split("```json")[1].split("```")[0].strip()

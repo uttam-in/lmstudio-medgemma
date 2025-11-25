@@ -1,8 +1,7 @@
 """Configuration for the dermatology classification system."""
 
-# LM Studio configuration
-LMSTUDIO_BASE_URL = "http://localhost:1234/v1"
-MODEL_NAME = "medgemma-27b-multimodal"
+# Gemini API configuration
+MODEL_NAME = "gemini-2.5-flash"  # or "gemini-2.5-pro" when available
 
 # Classification categories
 CATEGORIES = {
